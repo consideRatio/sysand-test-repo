@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for trusted publishing to sysand index
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve sysand publish branch commit
+        id: sysand_commit
+        run: |
+          echo "sha=$(git ls-remote https://github.com/consideratio/sysand.git publish | cut -f1)" >> "$GITHUB_OUTPUT"
+      - name: Cache sysand cargo install
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/bin/sysand
+          key: sysand-${{ runner.os }}-${{ steps.sysand_commit.outputs.sha }}
+      - name: Install sysand CLI
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cargo install sysand --git=https://github.com/consideratio/sysand.git --branch=publish
+
+      - name: Get GitHub token
+        id: github_token
+        run: |
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sysand" | jq -r '.value')
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Exchange GitHub token for Sysand index token
+        id: sysand_token
+        run: |
+          TOKEN=$(curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
+            -H "Content-Type: application/json" \
+            -d "{\"token\": \"${{ steps.github_token.outputs.token }}\"}" | jq -r '.token')
+          echo 'SYSAND_CRED_X=https://sysand-index-alpha.syside.app/api/v1/**' >> "$GITHUB_ENV"
+          echo "SYSAND_CRED_X_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - run: sysand --version
+
+      - name: sysand publish
+        run: |
+          mkdir proj0
+          cd proj0
+          sysand init --name proj0 --version "2.0.$(date +%s)"
+          sysand build
+          sysand publish --index https://sysand-index-alpha.syside.app

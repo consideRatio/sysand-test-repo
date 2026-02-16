@@ -1,0 +1,52 @@
+stages:
+  - resolve
+  - publish
+
+resolve-sysand-commit:
+  stage: resolve
+  image: alpine:latest
+  script:
+    - apk add --no-cache git
+    - echo "SYSAND_COMMIT_SHA=$(git ls-remote https://github.com/consideratio/sysand.git publish | cut -f1)" >> build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+
+publish:
+  stage: publish
+  image: rust:latest
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: sysand
+  needs:
+    - resolve-sysand-commit
+  cache:
+    key: sysand-${SYSAND_COMMIT_SHA}
+    paths:
+      - .cargo-bin/
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq jq > /dev/null
+  script:
+    - |
+      if [ -f .cargo-bin/sysand ]; then
+        cp .cargo-bin/sysand /usr/local/bin/sysand
+      else
+        cargo install sysand --git=https://github.com/consideratio/sysand.git --branch=publish
+        mkdir -p .cargo-bin
+        cp $CARGO_HOME/bin/sysand .cargo-bin/sysand
+      fi
+
+    - |
+      TOKEN=$(curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
+        -H "Content-Type: application/json" \
+        -d "{\"token\": \"${GITLAB_OIDC_TOKEN}\"}" | jq -r '.token')
+    - export SYSAND_CRED_X='https://sysand-index-alpha.syside.app/api/v1/**'
+    - export SYSAND_CRED_X_BEARER_TOKEN="$TOKEN"
+
+    - sysand --version
+
+    - mkdir proj0
+    - cd proj0
+    - sysand init --name proj0 --version "2.0.$(date +%s)"
+    - sysand build
+    - sysand publish --index https://sysand-index-alpha.syside.app
