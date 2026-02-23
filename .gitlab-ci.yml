@@ -42,10 +42,18 @@ publish:
         | grep -o '"token": *"[^"]*"' \
         | cut -d'"' -f4 \
       )
-    - export SYSAND_CRED_X='https://sysand-index-alpha.syside.app/api/v1/**'
-    - export SYSAND_CRED_X_BEARER_TOKEN="$TOKEN"
+      export SYSAND_CRED_X='https://sysand-index-alpha.syside.app/api/v1/**'
+      export SYSAND_CRED_X_BEARER_TOKEN="$TOKEN"
 
     - sysand --version
+
+    - |
+      ARCH=$(uname -m | sed 's/aarch64/arm64/')
+      curl -fsSL "https://github.com/sensmetry/sysand/releases/latest/download/sysand-linux-${ARCH}" \
+        -o /usr/local/bin/sysand
+      chmod +x /usr/local/bin/sysand
+
+      sysand --version
 
     - mkdir proj0
     - cd proj0
