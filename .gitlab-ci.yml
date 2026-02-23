@@ -58,6 +58,7 @@ publish-dev:
 
     - sysand --version
 
-    - sysand init --publisher Admin --name proj0 --version "2.0.$(date +%s)"
-    - sysand build
-    - sysand publish --index https://sysand-index-alpha.syside.app
+    - |
+      sysand init --publisher Admin --name proj0 --version "2.0.$(date +%s)"
+      sysand build
+      sysand publish --index https://sysand-index-alpha.syside.app
