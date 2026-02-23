@@ -39,7 +39,7 @@ publish:
         curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
           -H "Content-Type: application/json" \
           -d "{\"token\": \"${GITLAB_OIDC_TOKEN}\"}" \
-        | grep -o '"token":"[^"]*"' \
+        | grep -o '"token": *"[^"]*"' \
         | cut -d'"' -f4 \
       )
     - export SYSAND_CRED_X='https://sysand-index-alpha.syside.app/api/v1/**'
