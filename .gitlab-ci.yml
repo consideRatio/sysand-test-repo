@@ -24,8 +24,6 @@ publish:
     key: sysand-${SYSAND_COMMIT_SHA}
     paths:
       - .cargo-bin/
-  before_script:
-    - apt-get update -qq && apt-get install -y -qq jq > /dev/null
   script:
     - |
       if [ -f .cargo-bin/sysand ]; then
@@ -37,9 +35,13 @@ publish:
       fi
 
     - |
-      TOKEN=$(curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
-        -H "Content-Type: application/json" \
-        -d "{\"token\": \"${GITLAB_OIDC_TOKEN}\"}" | jq -r '.token')
+      TOKEN=$(
+        curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
+          -H "Content-Type: application/json" \
+          -d "{\"token\": \"${GITLAB_OIDC_TOKEN}\"}" \
+        | grep -o '"token":"[^"]*"' \
+        | cut -d'"' -f4 \
+      )
     - export SYSAND_CRED_X='https://sysand-index-alpha.syside.app/api/v1/**'
     - export SYSAND_CRED_X_BEARER_TOKEN="$TOKEN"
 

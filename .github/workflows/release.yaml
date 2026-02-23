@@ -29,15 +29,23 @@ jobs:
       - name: Get GitHub token
         id: github_token
         run: |
-          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sysand" | jq -r '.value')
+          TOKEN=$(
+            curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sysand" \
+            | grep -o '"value":"[^"]*"' \
+            | cut -d'"' -f4 \
+          )
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
       - name: Exchange GitHub token for Sysand index token
         id: sysand_token
         run: |
-          TOKEN=$(curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
-            -H "Content-Type: application/json" \
-            -d "{\"token\": \"${{ steps.github_token.outputs.token }}\"}" | jq -r '.token')
+          TOKEN=$(
+            curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
+              -H "Content-Type: application/json" \
+              -d "{\"token\": \"${{ steps.github_token.outputs.token }}\"}" \
+            | grep -o '"token":"[^"]*"' \
+            | cut -d'"' -f4 \
+          )
           echo 'SYSAND_CRED_X=https://sysand-index-alpha.syside.app/api/v1/**' >> "$GITHUB_ENV"
           echo "SYSAND_CRED_X_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
