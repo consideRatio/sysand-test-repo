@@ -60,5 +60,10 @@ publish-dev:
 
     - |
       sysand init --publisher Admin --name proj0 --version "2.0.$(date +%s)"
+      cat > README.md << 'READMEEOF'
+      # Project README
+
+      This is a Markdown `test` string used to verify `sysand` packaging.
+      READMEEOF
       sysand build
       sysand publish --index https://sysand-index-alpha.syside.app
