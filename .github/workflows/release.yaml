@@ -53,7 +53,7 @@ jobs:
 
       - name: sysand publish
         run: |
-          sysand init --publisher Admin --name proj0 --version "2.0.$(date +%s)"
+          sysand init --publisher Admin --name proj0 --license MIT --version "2.0.$(date +%s)"
           cat > README.md << 'READMEEOF'
           # Project README
 
@@ -97,7 +97,7 @@ jobs:
 
       - name: Build and publish a project to the index
         run: |
-          sysand init --publisher Admin --name proj0 --version "2.0.$(date +%s)"
+          sysand init --publisher Admin --name proj0 --license MIT --version "2.0.$(date +%s)"
           cat > README.md << 'READMEEOF'
           # Project README
 
