@@ -16,16 +16,12 @@ jobs:
           ARCH=$(uname -m | sed 's/aarch64/arm64/')
           SYSAND_VERSION=$(
             curl -fsSL https://api.github.com/repos/sensmetry/sysand/releases \
-              | awk -F'"' '/"tag_name":/ { tag=$4 } /"prerelease": true/ { print tag; exit }'
+              | awk -F'"' '/"tag_name":/ { tag=$4 } /"prerelease": true/ && !found { found=tag } END { if (found) print found }'
           )
-          test -n "$SYSAND_VERSION"
           SYSAND_ARCHIVE="sysand-linux-${ARCH}.tar.xz"
-          TMPDIR=$(mktemp -d)
-          trap 'rm -rf "$TMPDIR"' EXIT
-          curl -fsSL "https://github.com/sensmetry/sysand/releases/download/${SYSAND_VERSION}/${SYSAND_ARCHIVE}" \
-            -o "$TMPDIR/${SYSAND_ARCHIVE}"
-          tar -xJf "$TMPDIR/${SYSAND_ARCHIVE}" -C "$TMPDIR"
-          install -m 0755 "$TMPDIR/sysand" /usr/local/bin/sysand
+          curl -fsSL "https://github.com/sensmetry/sysand/releases/download/${SYSAND_VERSION}/sysand-linux-${ARCH}.tar.xz" \
+            | tar -xJ sysand
+          install -m 0755 sysand /usr/local/bin/sysand
           sysand --version
 
       - name: Acquire and configure sysand index credentials
