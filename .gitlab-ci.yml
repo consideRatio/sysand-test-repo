@@ -2,6 +2,7 @@ stages:
   - publish
 
 publish:
+  stage: publish
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: sysand
