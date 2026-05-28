@@ -3,9 +3,14 @@ stages:
 
 publish:
   stage: publish
+  image: ubuntu:24.04
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: sysand
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends ca-certificates curl xz-utils
+    - rm -rf /var/lib/apt/lists/*
   script:
     # install latest sysand pre-release
     - |
