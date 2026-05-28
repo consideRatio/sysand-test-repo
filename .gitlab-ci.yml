@@ -12,7 +12,7 @@ publish:
       ARCH=$(uname -m | sed 's/aarch64/arm64/')
       SYSAND_VERSION=$(
         curl -fsSL https://api.github.com/repos/sensmetry/sysand/releases \
-          | awk -F'"' '/"tag_name":/ { tag=$4 } /"prerelease": true/ { print tag; exit }'
+          | awk -F'"' '/"tag_name":/ { tag=$4 } /"prerelease": true/ && !found { found=tag } END { if (found) print found }'
       )
       test -n "$SYSAND_VERSION"
       SYSAND_ARCHIVE="sysand-linux-${ARCH}.tar.xz"
