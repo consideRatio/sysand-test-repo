@@ -1,69 +1,58 @@
 stages:
-  - resolve
   - publish
 
-resolve-sysand-commit:
-  stage: resolve
-  image: alpine:latest
-  script:
-    - apk add --no-cache git
-    - echo "SYSAND_COMMIT_SHA=$(git ls-remote https://github.com/consideratio/sysand.git publish | cut -f1)" >> build.env
-  artifacts:
-    reports:
-      dotenv: build.env
-
-publish-dev:
-  stage: publish
-  image: rust:latest
+publish:
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: sysand
-  needs:
-    - resolve-sysand-commit
-  cache:
-    key: sysand-${SYSAND_COMMIT_SHA}
-    paths:
-      - .cargo-bin/
   script:
-    # install latest sysand
+    # install latest sysand pre-release
     - |
       ARCH=$(uname -m | sed 's/aarch64/arm64/')
-      curl -fsSL "https://github.com/sensmetry/sysand/releases/latest/download/sysand-linux-${ARCH}" \
-        -o /usr/local/bin/sysand
-      chmod +x /usr/local/bin/sysand
-
+      SYSAND_VERSION=$(
+        curl -fsSL https://api.github.com/repos/sensmetry/sysand/releases \
+          | awk -F'"' '/"tag_name":/ { tag=$4 } /"prerelease": true/ { print tag; exit }'
+      )
+      test -n "$SYSAND_VERSION"
+      SYSAND_ARCHIVE="sysand-linux-${ARCH}.tar.xz"
+      TMPDIR=$(mktemp -d)
+      trap 'rm -rf "$TMPDIR"' EXIT
+      curl -fsSL "https://github.com/sensmetry/sysand/releases/download/${SYSAND_VERSION}/${SYSAND_ARCHIVE}" \
+        -o "$TMPDIR/${SYSAND_ARCHIVE}"
+      tar -xJf "$TMPDIR/${SYSAND_ARCHIVE}" -C "$TMPDIR"
+      install -m 0755 "$TMPDIR/sysand" /usr/local/bin/sysand
       sysand --version
-
-    # install cached dev version
-    - |
-      if [ -f .cargo-bin/sysand ]; then
-        cp .cargo-bin/sysand /usr/local/bin/sysand
-      else
-        cargo install sysand --git=https://github.com/consideratio/sysand.git --branch=publish
-        mkdir -p .cargo-bin
-        cp $CARGO_HOME/bin/sysand .cargo-bin/sysand
-      fi
 
     # acquire and configure sysand index credentials
     - |
       TOKEN=$(
-        curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
+        curl -s -X POST https://staging.sysand.com/api/v1/oidc/token \
           -H "Content-Type: application/json" \
           -d "{\"token\": \"${GITLAB_OIDC_TOKEN}\"}" \
         | grep -o '"token": *"[^"]*"' \
         | cut -d'"' -f4 \
       )
-      export SYSAND_CRED_X='https://sysand-index-alpha.syside.app/api/v1/**'
+      export SYSAND_CRED_X='https://staging.sysand.com/api/v1/**'
       export SYSAND_CRED_X_BEARER_TOKEN="$TOKEN"
 
-    - sysand --version
-
+    # initialize dummy project
     - |
       sysand init --publisher Admin --name proj0 --license MIT --version "2.0.$(date +%s)"
-      cat > README.md << 'READMEEOF'
+
+      cat > README.md << 'EOF'
       # Project README
 
       This is a Markdown `test` string used to verify `sysand` packaging.
-      READMEEOF
+      EOF
+
+      mkdir LICENSES
+      cat > LICENSES/MIT.txt << 'EOF'
+      MIT License
+
+      Dummy content.
+      EOF
+
+    # build and publish a project to the index
+    - |
       sysand build
-      sysand publish --index https://sysand-index-alpha.syside.app
+      sysand publish --index https://staging.sysand.com

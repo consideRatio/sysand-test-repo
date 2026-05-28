@@ -4,65 +4,7 @@ on:
   push:
 
 jobs:
-  publish-dev:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write # Required for trusted publishing to sysand index
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Resolve sysand publish branch commit
-        id: sysand_commit
-        run: |
-          echo "sha=$(git ls-remote https://github.com/consideratio/sysand.git publish | cut -f1)" >> "$GITHUB_OUTPUT"
-      - name: Cache sysand cargo install
-        id: cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.cargo/bin/sysand
-          key: sysand-${{ runner.os }}-${{ steps.sysand_commit.outputs.sha }}
-      - name: Install sysand CLI
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          cargo install sysand --git=https://github.com/consideratio/sysand.git --branch=publish
-
-      - name: Get GitHub token
-        id: github_token
-        run: |
-          TOKEN=$(
-            curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sysand" \
-            | grep -o '"value": *"[^"]*"' \
-            | cut -d'"' -f4 \
-          )
-          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
-      - name: Exchange GitHub token for Sysand index token
-        id: sysand_token
-        run: |
-          TOKEN=$(
-            curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
-              -H "Content-Type: application/json" \
-              -d "{\"token\": \"${{ steps.github_token.outputs.token }}\"}" \
-            | grep -o '"token": *"[^"]*"' \
-            | cut -d'"' -f4 \
-          )
-          echo 'SYSAND_CRED_X=https://sysand-index-alpha.syside.app/api/v1/**' >> "$GITHUB_ENV"
-          echo "SYSAND_CRED_X_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
-
-      - run: sysand --version
-
-      - name: sysand publish
-        run: |
-          sysand init --publisher Admin --name proj0 --license MIT --version "2.0.$(date +%s)"
-          cat > README.md << 'READMEEOF'
-          # Project README
-
-          This is a Markdown `test` string used to verify `sysand` packaging.
-          READMEEOF
-          sysand build
-          sysand publish --index https://sysand-index-alpha.syside.app
-
-  publish-latest:
+  publish:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -72,9 +14,18 @@ jobs:
       - name: Install sysand
         run: |
           ARCH=$(uname -m | sed 's/aarch64/arm64/')
-          curl -fsSL "https://github.com/sensmetry/sysand/releases/latest/download/sysand-linux-${ARCH}" \
-            -o /usr/local/bin/sysand
-          chmod +x /usr/local/bin/sysand
+          SYSAND_VERSION=$(
+            curl -fsSL https://api.github.com/repos/sensmetry/sysand/releases \
+              | awk -F'"' '/"tag_name":/ { tag=$4 } /"prerelease": true/ { print tag; exit }'
+          )
+          test -n "$SYSAND_VERSION"
+          SYSAND_ARCHIVE="sysand-linux-${ARCH}.tar.xz"
+          TMPDIR=$(mktemp -d)
+          trap 'rm -rf "$TMPDIR"' EXIT
+          curl -fsSL "https://github.com/sensmetry/sysand/releases/download/${SYSAND_VERSION}/${SYSAND_ARCHIVE}" \
+            -o "$TMPDIR/${SYSAND_ARCHIVE}"
+          tar -xJf "$TMPDIR/${SYSAND_ARCHIVE}" -C "$TMPDIR"
+          install -m 0755 "$TMPDIR/sysand" /usr/local/bin/sysand
           sysand --version
 
       - name: Acquire and configure sysand index credentials
@@ -86,22 +37,33 @@ jobs:
             | cut -d'"' -f4 \
           )
           SYSAND_INDEX_TOKEN=$(
-            curl -s -X POST https://sysand-index-alpha.syside.app/api/v1/oidc/token \
+            curl -s -X POST https://staging.sysand.com/api/v1/oidc/token \
               -H "Content-Type: application/json" \
               -d "{\"token\": \"${GITHUB_OIDC_TOKEN}\"}" \
             | grep -o '"token": *"[^"]*"' \
             | cut -d'"' -f4 \
           )
-          echo 'SYSAND_CRED_X=https://sysand-index-alpha.syside.app/api/v1/**' >> "$GITHUB_ENV"
+          echo 'SYSAND_CRED_X=https://staging.sysand.com/api/v1/**' >> "$GITHUB_ENV"
           echo "SYSAND_CRED_X_BEARER_TOKEN=$SYSAND_INDEX_TOKEN" >> "$GITHUB_ENV"
 
-      - name: Build and publish a project to the index
+      - name: initialize dummy project
         run: |
           sysand init --publisher Admin --name proj0 --license MIT --version "2.0.$(date +%s)"
-          cat > README.md << 'READMEEOF'
+
+          cat > README.md << 'EOF'
           # Project README
 
           This is a Markdown `test` string used to verify `sysand` packaging.
-          READMEEOF
+          EOF
+
+          mkdir LICENSES
+          cat > LICENSES/MIT.txt << 'EOF'
+          MIT License
+
+          Dummy content.
+          EOF
+
+      - name: Build and publish a project to the index
+        run: |
           sysand build
-          sysand publish --index https://sysand-index-alpha.syside.app
+          sysand publish --index https://staging.sysand.com
