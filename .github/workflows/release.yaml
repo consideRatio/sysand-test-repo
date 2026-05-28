@@ -49,6 +49,7 @@ jobs:
       - name: initialize dummy project
         run: |
           sysand init --publisher Admin --name proj0 --license MIT --version "2.0.$(date +%s)"
+          sysand info metamodel --set sysml
 
           cat > README.md << 'EOF'
           # Project README
