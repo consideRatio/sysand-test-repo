@@ -8,7 +8,27 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
+    env:
+      SYSAND_INDEX_URL: https://staging.sysand.com
     steps:
+      - name: Acquire and configure sysand index credentials
+        run: |
+          GITHUB_OIDC_TOKEN=$(
+            curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sysand" \
+            | grep -o '"value": *"[^"]*"' \
+            | cut -d'"' -f4 \
+          )
+          SYSAND_INDEX_TOKEN=$(
+            curl -s -X POST "${SYSAND_INDEX_URL}/api/v1/oidc/token" \
+              -H "Content-Type: application/json" \
+              -d "{\"token\": \"${GITHUB_OIDC_TOKEN}\"}" \
+            | grep -o '"token": *"[^"]*"' \
+            | cut -d'"' -f4 \
+          )
+          echo "SYSAND_CRED_X=${SYSAND_INDEX_URL}/api/v1/**" >> "$GITHUB_ENV"
+          echo "SYSAND_CRED_X_BEARER_TOKEN=$SYSAND_INDEX_TOKEN" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v6
 
       - name: Install sysand
@@ -33,13 +53,13 @@ jobs:
             | cut -d'"' -f4 \
           )
           SYSAND_INDEX_TOKEN=$(
-            curl -s -X POST https://staging.sysand.com/api/v1/oidc/token \
+            curl -s -X POST "${SYSAND_INDEX_URL}/api/v1/oidc/token" \
               -H "Content-Type: application/json" \
               -d "{\"token\": \"${GITHUB_OIDC_TOKEN}\"}" \
             | grep -o '"token": *"[^"]*"' \
             | cut -d'"' -f4 \
           )
-          echo 'SYSAND_CRED_X=https://staging.sysand.com/api/v1/**' >> "$GITHUB_ENV"
+          echo "SYSAND_CRED_X=${SYSAND_INDEX_URL}/api/v1/**" >> "$GITHUB_ENV"
           echo "SYSAND_CRED_X_BEARER_TOKEN=$SYSAND_INDEX_TOKEN" >> "$GITHUB_ENV"
 
       - name: initialize dummy project
@@ -63,4 +83,4 @@ jobs:
       - name: Build and publish a project to the index
         run: |
           sysand build
-          sysand publish --index https://staging.sysand.com
+          sysand publish --index "${SYSAND_INDEX_URL}"

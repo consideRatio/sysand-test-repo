@@ -3,38 +3,23 @@ stages:
 
 publish:
   stage: publish
-  image: ubuntu:24.04
+  image: ghcr.io/sensmetry/sysand:0.1.0-rc.1
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: sysand
-  before_script:
-    - apt-get update
-    - apt-get install -y --no-install-recommends ca-certificates curl xz-utils
-    - rm -rf /var/lib/apt/lists/*
+  variables:
+    SYSAND_INDEX_URL: https://staging.sysand.com
   script:
-    # install latest sysand pre-release
-    - |
-      ARCH=$(uname -m | sed 's/aarch64/arm64/')
-      SYSAND_VERSION=$(
-        curl -fsSL https://api.github.com/repos/sensmetry/sysand/releases \
-          | awk -F'"' '/"tag_name":/ { tag=$4 } /"prerelease": true/ && !found { found=tag } END { if (found) print found }'
-      )
-      SYSAND_ARCHIVE="sysand-linux-${ARCH}.tar.xz"
-      curl -fsSL "https://github.com/sensmetry/sysand/releases/download/${SYSAND_VERSION}/sysand-linux-${ARCH}.tar.xz" \
-        | tar -xJ sysand
-      install -m 0755 sysand /usr/local/bin/sysand
-      sysand --version
-
     # acquire and configure sysand index credentials
     - |
       TOKEN=$(
-        curl -s -X POST https://staging.sysand.com/api/v1/oidc/token \
+        curl -s -X POST "${SYSAND_INDEX_URL}/api/v1/oidc/token" \
           -H "Content-Type: application/json" \
           -d "{\"token\": \"${GITLAB_OIDC_TOKEN}\"}" \
         | grep -o '"token": *"[^"]*"' \
         | cut -d'"' -f4 \
       )
-      export SYSAND_CRED_X='https://staging.sysand.com/api/v1/**'
+      export SYSAND_CRED_X="${SYSAND_INDEX_URL}/api/v1/**"
       export SYSAND_CRED_X_BEARER_TOKEN="$TOKEN"
 
     # initialize dummy project
@@ -58,4 +43,4 @@ publish:
     # build and publish a project to the index
     - |
       sysand build
-      sysand publish --index https://staging.sysand.com
+      sysand publish --index "${SYSAND_INDEX_URL}"
