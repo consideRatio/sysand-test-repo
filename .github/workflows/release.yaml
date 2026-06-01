@@ -1,48 +1,38 @@
+# This is a GitHub workflow, defining a set of jobs each with a set of steps. It
+# will run when a git tag like v1.2.3 is pushed, and publish a release to the
+# chosen sysand index.
+#
+# ref: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+#
+# This is a GitHub workflow, defining a set of jobs each with a set of steps.
+#
+# The workflow will run when a git tag like v1.2.3 is pushed, and publish a
+# release to the chosen sysand index using trusted publishing.
+#
+# trusted publishing reference: https://docs.sysand.com/tutorial/setting-up-trusted-publishing
+# workflow config reference:    https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+#
 name: Release
 
 on:
   push:
+    tags: ["v*"]
+
+env:
+  SYSAND_INDEX_URL: https://staging.sysand.com
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
-    env:
-      SYSAND_INDEX_URL: https://staging.sysand.com
     steps:
-      - name: Acquire and configure sysand index credentials
-        run: |
-          GITHUB_OIDC_TOKEN=$(
-            curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sysand" \
-            | grep -o '"value": *"[^"]*"' \
-            | cut -d'"' -f4 \
-          )
-          SYSAND_INDEX_TOKEN=$(
-            curl -s -X POST "${SYSAND_INDEX_URL}/api/v1/oidc/token" \
-              -H "Content-Type: application/json" \
-              -d "{\"token\": \"${GITHUB_OIDC_TOKEN}\"}" \
-            | grep -o '"token": *"[^"]*"' \
-            | cut -d'"' -f4 \
-          )
-          echo "SYSAND_CRED_X=${SYSAND_INDEX_URL}/api/v1/**" >> "$GITHUB_ENV"
-          echo "SYSAND_CRED_X_BEARER_TOKEN=$SYSAND_INDEX_TOKEN" >> "$GITHUB_ENV"
-
       - uses: actions/checkout@v6
 
       - name: Install sysand
         run: |
-          ARCH=$(uname -m | sed 's/aarch64/arm64/')
-          SYSAND_VERSION=$(
-            curl -fsSL https://api.github.com/repos/sensmetry/sysand/releases \
-              | awk -F'"' '/"tag_name":/ { tag=$4 } /"prerelease": true/ && !found { found=tag } END { if (found) print found }'
-          )
-          SYSAND_ARCHIVE="sysand-linux-${ARCH}.tar.xz"
-          curl -fsSL "https://github.com/sensmetry/sysand/releases/download/${SYSAND_VERSION}/sysand-linux-${ARCH}.tar.xz" \
-            | tar -xJ sysand
-          install -m 0755 sysand /usr/local/bin/sysand
-          sysand --version
+          curl -fsSL https://client.sysand.com/install.sh | sh
 
       - name: Acquire and configure sysand index credentials
         run: |
@@ -62,23 +52,14 @@ jobs:
           echo "SYSAND_CRED_X=${SYSAND_INDEX_URL}/api/v1/**" >> "$GITHUB_ENV"
           echo "SYSAND_CRED_X_BEARER_TOKEN=$SYSAND_INDEX_TOKEN" >> "$GITHUB_ENV"
 
-      - name: initialize dummy project
+      - name: Check version in git tag matches the project's declared version
         run: |
-          sysand init --publisher Admin --name proj0 --license MIT --version "2.0.$(date +%s)"
-          sysand info metamodel --set sysml
-
-          cat > README.md << 'EOF'
-          # Project README
-
-          This is a Markdown `test` string used to verify `sysand` packaging.
-          EOF
-
-          mkdir LICENSES
-          cat > LICENSES/MIT.txt << 'EOF'
-          MIT License
-
-          Dummy content.
-          EOF
+          PROJECT_VERSION="$(sysand info version)"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PROJECT_VERSION" != "$TAG_VERSION" ]; then
+            echo "Project version ${PROJECT_VERSION} does not match tag ${GITHUB_REF_NAME}"
+            exit 1
+          fi
 
       - name: Build and publish a project to the index
         run: |
