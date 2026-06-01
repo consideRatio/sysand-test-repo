@@ -1,9 +1,3 @@
-# This is a GitHub workflow, defining a set of jobs each with a set of steps. It
-# will run when a git tag like v1.2.3 is pushed, and publish a release to the
-# chosen sysand index.
-#
-# ref: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
-#
 # This is a GitHub workflow, defining a set of jobs each with a set of steps.
 #
 # The workflow will run when a git tag like v1.2.3 is pushed, and publish a
@@ -30,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Learn more about the installation script, such as how to pin a specific
+      # version, at https://client.sysand.com/getting_started/installation.html#macos-and-linux.
+      #
       - name: Install sysand
         run: |
           curl -fsSL https://client.sysand.com/install.sh | sh
