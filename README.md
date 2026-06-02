@@ -19,7 +19,7 @@ To test either gitlab / github, I do this:
 
 ```shell
 REMOTE=gitlab
-VERSION=4.0.0
+VERSION=4.0.3
 
 sysand info version --set ${VERSION}
 git commit -am "Bump to ${VERSION}"
