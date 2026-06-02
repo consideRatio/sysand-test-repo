@@ -1,10 +1,15 @@
+# EVERYTHING BELOW, EXCEPT SYSAND_INDEX_URL WHICH SHOULD BE DECLARED TO
+# https://sysand.com, SHOULD BE KEPT IN SYNC WITH EXAMPLES PROVIDED FOR
+# SYSAND-INDEX DOCS.
+# ----------------------------------------------------------------------------
 # This is a GitHub workflow, defining a set of jobs each with a set of steps.
 #
 # The workflow will run when a git tag like v1.2.3 is pushed, and publish a
 # release to the chosen sysand index using trusted publishing.
 #
-# trusted publishing reference: https://docs.sysand.com/tutorial/setting-up-trusted-publishing
-# workflow config reference:    https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+# trusted publishing reference:  https://docs.sysand.com/tutorial/setting-up-trusted-publishing
+# workflow config reference:     https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+# installation script reference: https://client.sysand.com/getting-started/installation.html#macos-and-linux
 #
 name: Release
 
@@ -16,20 +21,39 @@ env:
   SYSAND_INDEX_URL: https://staging.sysand.com
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install sysand
+        run: |
+          curl -fsSL https://client.sysand.com/install.sh | sh -s -- --version latest
+
+      - name: Check version in git tag matches the project's declared version
+        run: |
+          PROJECT_VERSION="$(sysand info version)"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PROJECT_VERSION" != "$TAG_VERSION" ]; then
+            echo "Project version ${PROJECT_VERSION} does not match tag ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
   publish:
     runs-on: ubuntu-latest
+    needs: [test]
+    environment: sysand
     permissions:
       contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v6
 
-      # Learn more about the installation script, such as how to pin a specific
-      # version, at https://client.sysand.com/getting_started/installation.html#macos-and-linux.
-      #
       - name: Install sysand
         run: |
-          curl -fsSL https://client.sysand.com/install.sh | sh
+          curl -fsSL https://client.sysand.com/install.sh | sh -s -- --version latest
 
       - name: Acquire and configure sysand index credentials
         run: |
@@ -49,16 +73,7 @@ jobs:
           echo "SYSAND_CRED_X=${SYSAND_INDEX_URL}/api/v1/**" >> "$GITHUB_ENV"
           echo "SYSAND_CRED_X_BEARER_TOKEN=$SYSAND_INDEX_TOKEN" >> "$GITHUB_ENV"
 
-      - name: Check version in git tag matches the project's declared version
-        run: |
-          PROJECT_VERSION="$(sysand info version)"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          if [ "$PROJECT_VERSION" != "$TAG_VERSION" ]; then
-            echo "Project version ${PROJECT_VERSION} does not match tag ${GITHUB_REF_NAME}"
-            exit 1
-          fi
-
       - name: Build and publish a project to the index
         run: |
-          sysand build
+          sysand build --update-meta
           sysand publish --index "${SYSAND_INDEX_URL}"
