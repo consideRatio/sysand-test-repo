@@ -18,12 +18,12 @@ gitlab	git@gitlab.com:sensmetry/individual/erik-sundell/sysand-test-repo (push)
 To test either gitlab / github, I do this:
 
 ```shell
-REMOTE=gitlab
-VERSION=4.0.4
+REMOTE=github
+VERSION=4.0.6
 
 sysand info version --set ${VERSION}
 git commit -am "Bump to ${VERSION}"
 git tag -a v${VERSION} -m v${VERSION}
 
-git push $REMOTE main --follow-tags
+git push $REMOTE main refs/tags/$v${VERSION}
 ```
