@@ -2,7 +2,8 @@
 # https://sysand.com, SHOULD BE KEPT IN SYNC WITH EXAMPLES PROVIDED FOR
 # SYSAND-INDEX DOCS.
 # ----------------------------------------------------------------------------
-# This is a GitLab pipeline, defining a set of jobs each with a set of steps.
+# This is a GitLab pipeline configuration, defining a set of jobs grouped into
+# stages.
 #
 # The pipeline will run when a git tag like v1.2.3 is pushed, and publish a
 # release to the chosen sysand index using trusted publishing.
@@ -14,8 +15,9 @@
 # pipeline config reference:    https://docs.gitlab.com/ci/yaml/
 # sysand image reference:       https://github.com/sensmetry/sysand/blob/main/Dockerfile
 #
-rules:
-  - if: $CI_COMMIT_TAG
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG
 
 variables:
   SYSAND_INDEX_URL: https://staging.sysand.com
