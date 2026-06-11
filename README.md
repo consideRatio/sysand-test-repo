@@ -27,3 +27,7 @@ git tag -a v${VERSION} -m v${VERSION}
 
 git push $REMOTE main refs/tags/v${VERSION}
 ```
+
+Then visit either below to manually approve the run:
+- github: https://github.com/consideRatio/sysand-test-repo/actions
+- gitlab: https://gitlab.com/sensmetry/individual/erik-sundell/sysand-test-repo/-/pipelines
