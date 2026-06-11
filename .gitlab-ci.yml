@@ -28,7 +28,7 @@ stages:
 
 test:
   stage: test
-  image: ghcr.io/sensmetry/sysand:latest
+  image: ghcr.io/sensmetry/sysand:latest-alpine
   script:
     # check version in git tag matches the project's declared version
     - |
@@ -47,7 +47,7 @@ publish:
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: sysand
-  image: ghcr.io/sensmetry/sysand:latest
+  image: ghcr.io/sensmetry/sysand:latest-alpine
   script:
     # acquire and configure sysand index credentials
     - |
