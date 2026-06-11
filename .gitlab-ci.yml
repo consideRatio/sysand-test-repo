@@ -11,7 +11,7 @@
 # The image used is based on ubuntu's official image, with sysand, curl, and
 # ca-certificates installed.
 #
-# trusted publishing reference: https://docs.sysand.com/tutorial/setting-up-trusted-publishing
+# trusted publishing reference: https://docs.sysand.com/index/tutorials/setting-up-trusted-publishing
 # pipeline config reference:    https://docs.gitlab.com/ci/yaml/
 # sysand image reference:       https://github.com/sensmetry/sysand/blob/main/Dockerfile
 #
@@ -51,17 +51,24 @@ publish:
   script:
     # acquire and configure sysand index credentials
     - |
-      TOKEN=$(
-        curl -s -X POST "${SYSAND_INDEX_URL}/api/v1/oidc/token" \
+      TOKEN_EXCHANGE_RESPONSE=$(
+        curl -sS -X POST "${SYSAND_INDEX_URL}/api/v1/oidc/token" \
           -H "Content-Type: application/json" \
           -d "{\"token\": \"${GITLAB_OIDC_TOKEN}\"}" \
+      )
+      SYSAND_INDEX_TOKEN=$(
+        printf '%s' "$TOKEN_EXCHANGE_RESPONSE" \
         | grep -o '"token": *"[^"]*"' \
         | cut -d'"' -f4 \
       )
+      if [ -z "$SYSAND_INDEX_TOKEN" ]; then
+        echo "Sysand Index token exchange failed: ${TOKEN_EXCHANGE_RESPONSE}"
+        exit 1
+      fi
       export SYSAND_CRED_X="${SYSAND_INDEX_URL}/api/v1/**"
-      export SYSAND_CRED_X_BEARER_TOKEN="$TOKEN"
+      export SYSAND_CRED_X_BEARER_TOKEN="$SYSAND_INDEX_TOKEN"
 
     # build and publish a project to the index
     - |
-      sysand build --update-meta
+      sysand build
       sysand publish --index "${SYSAND_INDEX_URL}"

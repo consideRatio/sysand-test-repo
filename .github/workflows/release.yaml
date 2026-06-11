@@ -7,9 +7,9 @@
 # The workflow will run when a git tag like v1.2.3 is pushed, and publish a
 # release to the chosen sysand index using trusted publishing.
 #
-# trusted publishing reference:  https://docs.sysand.com/tutorial/setting-up-trusted-publishing
+# trusted publishing reference:  https://docs.sysand.com/index/tutorials/setting-up-trusted-publishing
 # workflow config reference:     https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
-# installation script reference: https://client.sysand.com/getting-started/installation.html#macos-and-linux
+# installation script reference: https://docs.sysand.com/client/getting-started/installation#macos-and-linux
 #
 name: Release
 
@@ -30,7 +30,7 @@ jobs:
 
       - name: Install sysand
         run: |
-          curl -fsSL https://client.sysand.com/install.sh | sh -s -- --version latest
+          curl -fsSL https://sysand.com/install.sh | sh -s -- --version latest
 
       - name: Check version in git tag matches the project's declared version
         run: |
@@ -53,7 +53,7 @@ jobs:
 
       - name: Install sysand
         run: |
-          curl -fsSL https://client.sysand.com/install.sh | sh -s -- --version latest
+          curl -fsSL https://sysand.com/install.sh | sh -s -- --version latest
 
       - name: Acquire and configure sysand index credentials
         run: |
@@ -63,17 +63,24 @@ jobs:
             | grep -o '"value": *"[^"]*"' \
             | cut -d'"' -f4 \
           )
-          SYSAND_INDEX_TOKEN=$(
-            curl -s -X POST "${SYSAND_INDEX_URL}/api/v1/oidc/token" \
+          TOKEN_EXCHANGE_RESPONSE=$(
+            curl -sS -X POST "${SYSAND_INDEX_URL}/api/v1/oidc/token" \
               -H "Content-Type: application/json" \
               -d "{\"token\": \"${GITHUB_OIDC_TOKEN}\"}" \
+          )
+          SYSAND_INDEX_TOKEN=$(
+            printf '%s' "$TOKEN_EXCHANGE_RESPONSE" \
             | grep -o '"token": *"[^"]*"' \
             | cut -d'"' -f4 \
           )
+          if [ -z "$SYSAND_INDEX_TOKEN" ]; then
+            echo "Sysand Index token exchange failed: ${TOKEN_EXCHANGE_RESPONSE}"
+            exit 1
+          fi
           echo "SYSAND_CRED_X=${SYSAND_INDEX_URL}/api/v1/**" >> "$GITHUB_ENV"
           echo "SYSAND_CRED_X_BEARER_TOKEN=$SYSAND_INDEX_TOKEN" >> "$GITHUB_ENV"
 
       - name: Build and publish a project to the index
         run: |
-          sysand build --update-meta
+          sysand build
           sysand publish --index "${SYSAND_INDEX_URL}"
