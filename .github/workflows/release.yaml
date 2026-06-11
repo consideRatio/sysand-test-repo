@@ -30,7 +30,7 @@ jobs:
 
       - name: Install sysand
         run: |
-          curl -fsSL https://sysand.com/install.sh | sh -s -- --version latest
+          curl -fsSL https://sysand.com/install.sh | SYSAND_VERSION=latest sh
 
       - name: Check version in git tag matches the project's declared version
         run: |
@@ -53,7 +53,7 @@ jobs:
 
       - name: Install sysand
         run: |
-          curl -fsSL https://sysand.com/install.sh | sh -s -- --version latest
+          curl -fsSL https://sysand.com/install.sh | SYSAND_VERSION=latest sh
 
       - name: Acquire and configure sysand index credentials
         run: |
