@@ -1,5 +1,13 @@
 {
-  "index": {},
+  "index": {
+    "Part Tree Example": "main.sysml"
+  },
   "created": "2026-06-01T08:53:04.205795608Z",
-  "metamodel": "https://www.omg.org/spec/SysML/20250201"
+  "metamodel": "https://www.omg.org/spec/SysML/20250201",
+  "checksum": {
+    "main.sysml": {
+      "value": "",
+      "algorithm": "NONE"
+    }
+  }
 }
