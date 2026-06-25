@@ -9,7 +9,7 @@
 #
 # trusted publishing reference:  https://docs.sysand.com/index/tutorials/setting-up-trusted-publishing
 # workflow config reference:     https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
-# installation script reference: https://docs.sysand.com/client/getting-started/installation#macos-and-linux
+# workflow cache reference:      https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching
 #
 name: Release
 
@@ -28,9 +28,26 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install sysand
+      - name: Resolve sysand source commit
+        id: sysand_commit
         run: |
-          curl -fsSL https://sysand.com/install.sh | SYSAND_VERSION=latest sh
+          echo "sha=$(git ls-remote https://github.com/consideratio/sysand.git HEAD | cut -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache sysand install
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/bin/sysand
+          key: sysand-${{ runner.os }}-${{ steps.sysand_commit.outputs.sha }}
+
+      - name: Install Rust
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install sysand
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cargo install --git https://github.com/consideratio/sysand.git sysand --locked
 
       - name: Check version in git tag matches the project's declared version
         run: |
@@ -51,9 +68,26 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install sysand
+      - name: Resolve sysand source commit
+        id: sysand_commit
         run: |
-          curl -fsSL https://sysand.com/install.sh | SYSAND_VERSION=latest sh
+          echo "sha=$(git ls-remote https://github.com/consideratio/sysand.git HEAD | cut -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache sysand install
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/bin/sysand
+          key: sysand-${{ runner.os }}-${{ steps.sysand_commit.outputs.sha }}
+
+      - name: Install Rust
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install sysand
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cargo install --git https://github.com/consideratio/sysand.git sysand --locked
 
       - name: Build and publish a project to the index
         run: |

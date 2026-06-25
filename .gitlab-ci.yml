@@ -8,12 +8,12 @@
 # The pipeline will run when a git tag like v1.2.3 is pushed, and publish a
 # release to the chosen sysand index using trusted publishing.
 #
-# The image used is based on ubuntu's official image, with sysand, curl, and
-# ca-certificates installed.
+# The image used includes Rust and Cargo so sysand can be installed from source.
+# The installed sysand binary is cached by source commit.
 #
 # trusted publishing reference: https://docs.sysand.com/index/tutorials/setting-up-trusted-publishing
 # pipeline config reference:    https://docs.gitlab.com/ci/yaml/
-# sysand image reference:       https://github.com/sensmetry/sysand/blob/main/Dockerfile
+# rust image reference:         https://hub.docker.com/_/rust
 #
 workflow:
   rules:
@@ -22,14 +22,47 @@ workflow:
 variables:
   SYSAND_INDEX_URL: https://staging.sysand.com
 
+default:
+  image: rust:latest
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends ca-certificates cmake git && rm -rf /var/lib/apt/lists/*
+  cache:
+    key: sysand-${SYSAND_COMMIT_SHA}
+    paths:
+      - .cargo-bin/
+
 stages:
+  - resolve
   - test
   - publish
 
+resolve-sysand-commit:
+  stage: resolve
+  image: alpine:latest
+  before_script: []
+  cache: []
+  script:
+    - apk add --no-cache git
+    - echo "SYSAND_COMMIT_SHA=$(git ls-remote https://github.com/consideratio/sysand.git HEAD | cut -f1)" >> build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+
 test:
   stage: test
-  image: ghcr.io/sensmetry/sysand:latest-alpine
+  needs:
+    - resolve-sysand-commit
   script:
+    # install sysand from source, reusing a cache keyed by the source commit
+    - |
+      if [ -f .cargo-bin/sysand ]; then
+        install -m 0755 .cargo-bin/sysand /usr/local/bin/sysand
+      else
+        cargo install --git https://github.com/consideratio/sysand.git sysand --locked
+        mkdir -p .cargo-bin
+        cp "${CARGO_HOME}/bin/sysand" .cargo-bin/sysand
+      fi
+
     # check version in git tag matches the project's declared version
     - |
       PROJECT_VERSION="$(sysand info version)"
@@ -41,14 +74,25 @@ test:
 
 publish:
   stage: publish
+  needs:
+    - resolve-sysand-commit
   environment:
     name: sysand
     url: https://sysand.com
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: sysand
-  image: ghcr.io/sensmetry/sysand:latest-alpine
   script:
+    # install sysand from source, reusing a cache keyed by the source commit
+    - |
+      if [ -f .cargo-bin/sysand ]; then
+        install -m 0755 .cargo-bin/sysand /usr/local/bin/sysand
+      else
+        cargo install --git https://github.com/consideratio/sysand.git sysand --locked
+        mkdir -p .cargo-bin
+        cp "${CARGO_HOME}/bin/sysand" .cargo-bin/sysand
+      fi
+
     # build and publish a project to the index
     - |
       sysand build
