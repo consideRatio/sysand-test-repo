@@ -55,31 +55,6 @@ jobs:
         run: |
           curl -fsSL https://sysand.com/install.sh | SYSAND_VERSION=latest sh
 
-      - name: Acquire and configure sysand index credentials
-        run: |
-          GITHUB_OIDC_TOKEN=$(
-            curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sysand" \
-            | grep -o '"value": *"[^"]*"' \
-            | cut -d'"' -f4 \
-          )
-          TOKEN_EXCHANGE_RESPONSE=$(
-            curl -sS -X POST "${SYSAND_INDEX_URL}/api/v1/oidc/token" \
-              -H "Content-Type: application/json" \
-              -d "{\"token\": \"${GITHUB_OIDC_TOKEN}\"}" \
-          )
-          SYSAND_INDEX_TOKEN=$(
-            printf '%s' "$TOKEN_EXCHANGE_RESPONSE" \
-            | grep -o '"token": *"[^"]*"' \
-            | cut -d'"' -f4 \
-          )
-          if [ -z "$SYSAND_INDEX_TOKEN" ]; then
-            echo "Sysand Index token exchange failed: ${TOKEN_EXCHANGE_RESPONSE}"
-            exit 1
-          fi
-          echo "SYSAND_CRED_X=${SYSAND_INDEX_URL}/api/v1/**" >> "$GITHUB_ENV"
-          echo "SYSAND_CRED_X_BEARER_TOKEN=$SYSAND_INDEX_TOKEN" >> "$GITHUB_ENV"
-
       - name: Build and publish a project to the index
         run: |
           sysand build
